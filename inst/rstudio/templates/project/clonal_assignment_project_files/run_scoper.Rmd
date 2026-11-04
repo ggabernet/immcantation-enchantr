@@ -9,27 +9,29 @@ if (sum(heavy_chains)>0) {
             db_light <- db %>% filter(!isHeavyChain(locus))
             cell_id <- NULL
             if (all(c(T,F) %in% db[[ singlecell ]])) {
-                warning("Mix of single and bulk data. Setting cell_id=`NULL`.")
+                warning("Mix of single-cell and bulk data. Setting cell_id=`NULL`.")
             }
         }
         db <- hierarchicalClones(db, 
-                                 params$threshold, 
-                                 method=params$method,
-                                 linkage=params$linkage, 
-                                 normalize="len",
-                                 junction="junction", 
-                                 v_call="v_call", j_call="j_call", 
-                                 clone="clone_id", 
-                                 fields=params$cloneby,
-                                 cell_id=cell_id, 
-                                 locus="locus", 
-                                 only_heavy=TRUE, 
-                                 split_light=TRUE,
-                                 first=FALSE, 
-                                 cdr3=FALSE, mod3=FALSE, 
-                                 max_n=0, nproc=params$nproc,
-                                 verbose=FALSE, log=NULL,
-                                 summarize_clones=FALSE) 
+                                params$threshold, 
+                                method=params$method,
+                                linkage=params$linkage, 
+                                normalize="len",
+                                junction="junction", 
+                                v_call="v_call", 
+                                j_call="j_call", 
+                                clone="clone_id", 
+                                fields=params$cloneby,
+                                cell_id=cell_id, 
+                                locus="locus", 
+                                first=FALSE, 
+                                cdr3=FALSE, 
+                                mod3=FALSE, 
+                                max_n=0, 
+                                nproc=params$nproc,
+                                verbose=FALSE, 
+                                log=NULL,
+                                summarize_clones=FALSE) 
     } else {
         stop("Unsuported model requested. Supported models: hierarchical")
     }
@@ -42,6 +44,21 @@ if (sum(heavy_chains)>0) {
 `r nrow(db)` sequences passed the clonal assignment step 
 and `r input_size - nrow(db)` were removed. `r sum(is.na(db[['clone_id']]))` sequences
 have `clone_id==NA`.
+
+## Resolve light chains
+
+For exclusively single-cell sequences, BCR clones are split based on their light chain
+V and J genes and junction length. TCR clones are split based on their alpha and beta chain V and J genes and CDR3 identity.
+
+```{r resolve_light_chains, eval=(all(db[[ singlecell ]])) & (all(db[[ locus ]]) %in% c("IGH", "IGK", "IGL"))}
+#TODO double check this 
+#TODO will this code also apply for TR?
+db <- db %>%
+    group_by(clone_id) %>%
+    resolveLightChains(nproc=params$nproc) %>%
+    mutate(clone_id = paste(clone_id, clone_subgroup, sep = "_"))
+
+```
 
 ## Create germlines
 
@@ -60,6 +77,7 @@ are replaced with N's. This is often done because the germline base calls from t
 </div>
 
 ```{r}
+#TODO: check that create germlines is creating the right germline for light chains.
 pre_germ_size <- nrow(db)
 db[['tmp_nrow']] <- 1:nrow(db)
 
@@ -68,7 +86,7 @@ imgt_db <- prepareIMGT(params$imgt_db)
 
 references <- dowser::readIMGT(file.path(imgt_db,
                                 species, "vdj"),
-                               quiet=TRUE)
+                                quiet=TRUE)
 
 # tmp fix (add unique sequence id ) for
 # Error in dowser::createGermlines(db_sp, references, locus = "locus",  :
@@ -84,6 +102,7 @@ if (dup_ids) {
         mutate(sequence_id = paste(sample_id, sequence_id, sep = '_'))
 }
 
+# Avoid assigning germlines to sequences without a clone_id
 is_na_clone <- is.na(db[["clone_id"]])
 not_na_clone_db <- data.frame()
 na_clone_db <- data.frame()
@@ -157,6 +176,7 @@ and `r pre_germ_size - nrow(db)` failed.
 
 ```{r eval=(any_germ_fail & !is.null(cell_id)) }
 # Remove cells that after createGermlines
+# TODO check why sequences are removed after createGermlines
 # have only light chains
 db <- findLightOnlyCells(db, 
                          sample_id = "sample_id", cell_id = cell_id,
