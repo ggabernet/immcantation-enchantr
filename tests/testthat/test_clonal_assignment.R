@@ -239,6 +239,29 @@ test_that("clonal assignment 1:1", {
 #     expect_equal(nrow(db), 1427)  
 # })
 
+test_that("clonal assignment example", {
+    skip_on_cran()
+    tmp_dir <- file.path(tempdir(),"clonal_assignment_example")
+    db_path <- file.path("..", "data-tests", "clonal_analysis", "clonal_results.tsv")
+    enchantr_report('clonal_assignment',
+                    report_params=list(
+                                       'input'=db_path,
+                                       'outdir'=tmp_dir,
+                                       'nproc'=1,
+                                       'log'='test_clonal_assignment_command_log'))
+    report_dir <- file.path(tmp_dir,"enchantr")
+    repertoires <- list.files(file.path(report_dir, "repertoires"), full.names = T)
+    expect_true(length(repertoires) > 0)
+
+    for (fn in repertoires) {
+        # Load just the first 2 rows to check that the column exists
+        db <- read_rearrangement(fn, n_max=2)
+        expect_true("expected_clone_id_split_light_F" %in% colnames(db))
+        expect_true("expected_clone_id_split_light_T" %in% colnames(db))
+        expect_true("expected_clone_subgroup" %in% colnames(db))
+    }
+})
+
 
 test_that("convergence example", {
     # Uses the report's own bundled example data and default params

@@ -50,13 +50,13 @@ have `clone_id==NA`.
 For exclusively single-cell sequences, BCR clones are split based on their light chain
 V and J genes and junction length. TCR clones are split based on their alpha and beta chain V and J genes and CDR3 identity.
 
-```{r resolve_light_chains, eval=(all(db[[ singlecell ]])) & (all(db[[ locus ]]) %in% c("IGH", "IGK", "IGL"))}
-#TODO double check this 
-#TODO will this code also apply for TR?
+```{r resolve_light_chains, eval=(all(db[[ singlecell ]])) & (all(db$locus %in% c("IGH", "IGK", "IGL")))}
+# Overwrite clone_id with clone_subgroup from resolve light chains.
+
 db <- db %>%
     group_by(clone_id) %>%
     resolveLightChains(nproc=params$nproc) %>%
-    mutate(clone_id = paste(clone_id, clone_subgroup, sep = "_"))
+    mutate(clone_id = clone_subgroup)
 
 ```
 
