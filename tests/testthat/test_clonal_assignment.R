@@ -253,12 +253,12 @@ test_that("clonal assignment example", {
     repertoires <- list.files(file.path(report_dir, "repertoires"), full.names = T)
     expect_true(length(repertoires) > 0)
 
+    expected_results <- read_rearrangement(db_path)
     for (fn in repertoires) {
-        # Load just the first 2 rows to check that the column exists
-        db <- read_rearrangement(fn, n_max=2)
-        expect_true("expected_clone_id_split_light_F" %in% colnames(db))
-        expect_true("expected_clone_id_split_light_T" %in% colnames(db))
-        expect_true("expected_clone_subgroup" %in% colnames(db))
+        db <- read_rearrangement(fn)
+        expect_equal(nrow(db), 26)
+        db_with_expected <- db %>% left_join(expected_results, by="sequence_id")
+        expect_true(all(db_with_expected$clone_id == db_with_expected$expected_clone_id_resolvelightchains))
     }
 })
 
